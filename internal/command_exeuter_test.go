@@ -24,7 +24,7 @@ func TestExecute(t *testing.T) {
 		err = gomake.actionExecuter.execute([]target{"target", "target"})
 		assertErr(t, err, ErrCouldntExecuteCommand)
 	})
-	
+
 	t.Run("dependency not exist", func(t *testing.T) {
 		gomake := NewGomake()
 

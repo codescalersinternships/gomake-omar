@@ -16,7 +16,7 @@ func TestGetCycle(t *testing.T) {
 
 		assertEqualCycles(t, cycleGot, []target{})
 	})
-	
+
 	t.Run("there is a cycle", func(t *testing.T) {
 		graph := newGraph(map[target][]parent{
 			"a": {"c", "b"},
