@@ -79,7 +79,7 @@ func (gomake *gomake) addTargetLine(targetLine string) (target, error) {
 	return target, nil
 }
 
-func (gomake *gomake) loadFromFile(f io.Reader) error {
+func (gomake *gomake) loadData(f io.Reader) error {
 	fileScanner := bufio.NewScanner(f)
 	fileScanner.Split(bufio.ScanLines)
 
@@ -93,7 +93,11 @@ func (gomake *gomake) loadFromFile(f io.Reader) error {
 			if err != nil {
 				return err
 			}
-		} else if strings.Contains(line, ":") {
+
+			continue
+		}
+
+		if strings.Contains(line, ":") {
 			// this is rule
 			target, err := gomake.addTargetLine(line)
 			if err != nil {
@@ -101,12 +105,24 @@ func (gomake *gomake) loadFromFile(f io.Reader) error {
 			}
 
 			currentTargetName = target
-		} else if strings.TrimSpace(line) != "" {
+			continue
+		}
+
+		if strings.TrimSpace(line) != "" {
 			return fmt.Errorf("%w, at line %q", ErrInvalidMakefileFormat, line)
 		}
 	}
 
 	return nil
+}
+
+func getCycleString(cycle []target) string {
+	castedCycle := make([]string, len(cycle))
+	for i, v := range cycle {
+		castedCycle[i] = string(v)
+	}
+
+	return fmt.Sprintf("%v -> %v", strings.Join(castedCycle, " -> "), castedCycle[0])
 }
 
 // RunGoMake checks if there's cyclic dependency within makefile then run target
@@ -125,7 +141,7 @@ func (gomake *gomake) RunGoMake(filePath, targetToExecute string) error {
 	}
 	defer file.Close()
 
-	err = gomake.loadFromFile(file)
+	err = gomake.loadData(file)
 	if err != nil {
 		return err
 	}
@@ -134,12 +150,7 @@ func (gomake *gomake) RunGoMake(filePath, targetToExecute string) error {
 	cycle := graph.getCycle()
 
 	if len(cycle) != 0 {
-		castedCycle := make([]string, len(cycle))
-		for i, v := range cycle {
-			castedCycle[i] = string(v)
-		}
-		cycleStr := fmt.Sprintf("%v -> %v", strings.Join(castedCycle, " -> "), castedCycle[0])
-		return fmt.Errorf("%w, cycle: %q", ErrCyclicDependency, cycleStr)
+		return fmt.Errorf("%w, cycle: %q", ErrCyclicDependency, getCycleString(cycle))
 	}
 
 	dependencies := graph.getDependency(target(targetToExecute))

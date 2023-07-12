@@ -25,12 +25,9 @@ func (g *graph) isCyclic(currentNode target) bool {
 	for _, nextNode := range g.adjacencyList[currentNode] {
 		nextNode := target(nextNode)
 
-		if g.isExploring[nextNode] {
+		if g.isExploring[nextNode] ||
+			(!g.isVisited[nextNode] && g.isCyclic(nextNode)) {
 			return true
-		} else if !g.isVisited[nextNode] {
-			if g.isCyclic(nextNode) {
-				return true
-			}
 		}
 	}
 

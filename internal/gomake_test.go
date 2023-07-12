@@ -41,7 +41,7 @@ func actionGraphSample1() map[target][]action {
 	}
 }
 
-func TestLoadFromFile(t *testing.T) {
+func TestLoadData(t *testing.T) {
 	t.Run("valid makefile format", func(t *testing.T) {
 		f, err := os.CreateTemp("", "test_file")
 		assertErr(t, err, nil)
@@ -53,7 +53,7 @@ func TestLoadFromFile(t *testing.T) {
 		assertErr(t, err, nil)
 
 		gomake := NewGomake()
-		err = gomake.loadFromFile(f)
+		err = gomake.loadData(f)
 		assertErr(t, err, nil)
 
 		assertEqualDepGraphs(t, gomake.dependencyGraph, depGraphSample1())
@@ -96,7 +96,7 @@ func TestLoadFromFile(t *testing.T) {
 			assertErr(t, err, nil)
 
 			gomake := NewGomake()
-			err = gomake.loadFromFile(f)
+			err = gomake.loadData(f)
 			assertErr(t, err, tc.err)
 		})
 	}
