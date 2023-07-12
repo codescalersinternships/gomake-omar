@@ -200,6 +200,7 @@ b:
 }
 
 func assertErr(t testing.TB, got, want error) {
+	t.Helper()
 	if !errors.Is(got, want) {
 		if got == nil {
 			t.Errorf("got nil want %q", want.Error())
@@ -212,6 +213,7 @@ func assertErr(t testing.TB, got, want error) {
 }
 
 func assertEqualDepGraphs(t testing.TB, got, want map[target][]parent) {
+	t.Helper()
 	for k, v := range got {
 		if want[k] == nil {
 			t.Errorf("got %v want %v", got, want)
@@ -236,6 +238,7 @@ func assertEqualDepGraphs(t testing.TB, got, want map[target][]parent) {
 }
 
 func assertEqualActionGraphs(t testing.TB, got, want map[target][]action) {
+	t.Helper()
 	for k, v := range got {
 		if want[k] == nil {
 			t.Errorf("got %v want %v", got, want)

@@ -50,6 +50,7 @@ func TestGetDependency(t *testing.T) {
 }
 
 func assertEqualCycles(t testing.TB, cycleGot, cycleWant []target) {
+	t.Helper()
 	if len(cycleGot) == 0 && len(cycleWant) == 0 {
 		return
 	}
