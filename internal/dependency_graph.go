@@ -8,7 +8,7 @@ type graph struct {
 	dfsStack    []target
 }
 
-func NewGraph(adjacencyList map[target][]parent) graph {
+func newGraph(adjacencyList map[target][]parent) graph {
 	return graph{
 		adjacencyList: adjacencyList,
 		isVisited:     map[target]bool{},
@@ -24,6 +24,7 @@ func (g *graph) isCyclic(currentNode target) bool {
 
 	for _, nextNode := range g.adjacencyList[currentNode] {
 		nextNode := target(nextNode)
+
 		if g.isExploring[nextNode] {
 			return true
 		} else if !g.isVisited[nextNode] {
@@ -38,27 +39,29 @@ func (g *graph) isCyclic(currentNode target) bool {
 	return false
 }
 
-func (g *graph) dfs(currentNode target) []target {
+func (g *graph) topologicalSort(currentNode target) []target {
 	g.isVisited[currentNode] = true
 
-	targetsRet := []target{currentNode}
+	targetsOrder := []target{}
 	for _, nextNode := range g.adjacencyList[currentNode] {
 		nextNode := target(nextNode)
 		if !g.isVisited[nextNode] {
-			targetsRet = append(targetsRet, g.dfs(nextNode)...)
+			targetsOrder = append(targetsOrder, g.topologicalSort(nextNode)...)
 		}
 	}
 
-	return targetsRet
+	targetsOrder = append(targetsOrder, currentNode)
+	return targetsOrder
 }
 
 func (g *graph) getDependency(currentTarget target) []target {
 	g.isVisited = map[target]bool{}
-	return g.dfs(currentTarget)
+	return g.topologicalSort(currentTarget)
 }
 
 func (g *graph) getCycle() []target {
 	isCyclic := false
+
 	for k := range g.adjacencyList {
 		if g.isVisited[k] {
 			continue

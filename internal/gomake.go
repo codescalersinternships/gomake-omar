@@ -9,13 +9,12 @@ import (
 	"strings"
 )
 
-// define error
 var (
-	ErrInvalidMakefileFormat = errors.New("invalid makefile format") // 1
-	ErrTargetMustBeSpecified = errors.New("target must be specified") // 5
-	ErrCyclicDependency      = errors.New("there is a cyclic dependency") // 5
-	ErrCouldntExecuteCommand = errors.New("couldn't execute command") // 2
-	ErrDependencyNotFound    = errors.New("dependency rule is not found") // 5
+	ErrInvalidMakefileFormat = errors.New("invalid makefile format")
+	ErrTargetMustBeSpecified = errors.New("target must be specified")
+	ErrCyclicDependency      = errors.New("there is a cyclic dependency")
+	ErrCouldntExecuteCommand = errors.New("couldn't execute command")
+	ErrDependencyNotFound    = errors.New("dependency rule is not found")
 )
 
 type target string
@@ -23,13 +22,14 @@ type parent string
 
 type gomake struct {
 	dependencyGraph map[target][]parent
-	executer        executer
+	actionExecuter  executer
 }
 
+// NewGomake is a factory of gomake struct
 func NewGomake() gomake {
 	return gomake{
 		dependencyGraph: map[target][]parent{},
-		executer:        NewExecuter(),
+		actionExecuter:  newExecuter(),
 	}
 }
 
@@ -40,7 +40,7 @@ func (gomake *gomake) addActionLine(target target, actionLine string) error {
 
 	action := action(strings.TrimSpace(actionLine))
 	if action != "" {
-		gomake.executer.setAction(target, action)
+		gomake.actionExecuter.setAction(target, action)
 	}
 
 	return nil
@@ -55,19 +55,25 @@ func (gomake *gomake) addTargetLine(targetLine string) (target, error) {
 		return "", ErrTargetMustBeSpecified
 	}
 
-	if gomake.dependencyGraph[target] == nil {
-		gomake.dependencyGraph[target] = []parent{}
-	}
-
+	filteredParents := []parent{}
 	for _, p := range parents {
-		if p == "" {
-			continue
-		}
-
 		parent := parent(strings.TrimSpace(p))
 		if parent != "" {
-			gomake.dependencyGraph[target] = append(gomake.dependencyGraph[target], parent)
+			filteredParents = append(filteredParents, parent)
 		}
+	}
+
+	if gomake.dependencyGraph[target] != nil {
+		// target appeared before
+		fmt.Printf("warning: overriding recipe for target %q\n", target)
+		fmt.Printf("warning: ignoring old recipe for target %q\n", target)
+
+		gomake.actionExecuter.removeActions(target)
+
+		// append at the front to keep dependency order as makefile doing
+		gomake.dependencyGraph[target] = append(filteredParents, gomake.dependencyGraph[target]...)
+	} else {
+		gomake.dependencyGraph[target] = filteredParents
 	}
 
 	return target, nil
@@ -99,10 +105,11 @@ func (gomake *gomake) loadFromFile(f io.Reader) error {
 			return fmt.Errorf("%w, at line %q", ErrInvalidMakefileFormat, line)
 		}
 	}
+
 	return nil
 }
 
-// RunGoMake checks if there's cyclic dependency within makefile
+// RunGoMake checks if there's cyclic dependency within makefile then run target
 func (gomake *gomake) RunGoMake(filePath, targetToExecute string) error {
 	if targetToExecute == "" {
 		return fmt.Errorf("%w, use -t to specify it", ErrTargetMustBeSpecified)
@@ -123,19 +130,18 @@ func (gomake *gomake) RunGoMake(filePath, targetToExecute string) error {
 		return err
 	}
 
-	graph := NewGraph(gomake.dependencyGraph)
+	graph := newGraph(gomake.dependencyGraph)
 	cycle := graph.getCycle()
 
 	if len(cycle) != 0 {
-		reversedCycle := []string{}
-		for i := len(cycle) - 1; i >= 0; i-- {
-			reversedCycle = append(reversedCycle, string(cycle[i]))
+		castedCycle := make([]string, len(cycle))
+		for i, v := range cycle {
+			castedCycle[i] = string(v)
 		}
-
-		cycleStr := strings.Join(reversedCycle, "->")
+		cycleStr := fmt.Sprintf("%v -> %v", strings.Join(castedCycle, " -> "), castedCycle[0])
 		return fmt.Errorf("%w, cycle: %q", ErrCyclicDependency, cycleStr)
 	}
 
 	dependencies := graph.getDependency(target(targetToExecute))
-	return gomake.executer.execute(dependencies)
+	return gomake.actionExecuter.execute(dependencies)
 }

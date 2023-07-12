@@ -12,10 +12,14 @@ type executer struct {
 	targetActions map[target][]action
 }
 
-func NewExecuter() executer {
+func newExecuter() executer {
 	return executer{
 		targetActions: map[target][]action{},
 	}
+}
+
+func (exe *executer) removeActions(target target) {
+	exe.targetActions[target] = []action{}
 }
 
 func (exe *executer) setAction(target target, action action) {
@@ -27,6 +31,7 @@ func (exe *executer) execute(targets []target) error {
 		if exe.targetActions[target] == nil {
 			return fmt.Errorf("%w, rule: %q", ErrDependencyNotFound, target)
 		}
+
 		actions := exe.targetActions[target]
 		for _, action := range actions {
 			if action[0] != '@' {
@@ -40,12 +45,14 @@ func (exe *executer) execute(targets []target) error {
 			cmdArgs := parts[1:]
 			cmd := exec.Command(cmdName, cmdArgs...)
 			output, err := cmd.CombinedOutput()
-			
+
 			if err != nil {
 				return fmt.Errorf("%w, %q", ErrCouldntExecuteCommand, err)
 			}
-			fmt.Println(string(output))
+
+			fmt.Print(string(output))
 		}
 	}
+
 	return nil
 }

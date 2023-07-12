@@ -7,7 +7,7 @@ import (
 
 func TestGetCycle(t *testing.T) {
 	t.Run("no cycle", func(t *testing.T) {
-		graph := NewGraph(map[target][]parent{
+		graph := newGraph(map[target][]parent{
 			"a": {"b", "c"},
 			"b": {"c"},
 			"x": {"y"},
@@ -16,8 +16,9 @@ func TestGetCycle(t *testing.T) {
 
 		assertEqualCycles(t, cycleGot, []target{})
 	})
+	
 	t.Run("there is a cycle", func(t *testing.T) {
-		graph := NewGraph(map[target][]parent{
+		graph := newGraph(map[target][]parent{
 			"a": {"c", "b"},
 			"c": {"d"},
 			"d": {"a"},
@@ -32,14 +33,15 @@ func TestGetCycle(t *testing.T) {
 
 func TestGetDependency(t *testing.T) {
 	t.Run("no cycle", func(t *testing.T) {
-		graph := NewGraph(map[target][]parent{
-			"a": {"b", "x"},
-			"b": {"d"},
-			"d": {"c"},
+		graph := newGraph(map[target][]parent{
+			"r": {"a", "o"},
+			"a": {"o", "m"},
+			"c": {},
+			"d": {},
 			"x": {"y"},
 		})
-		depGot := graph.getDependency("a")
-		depWant := []target{"a", "b", "d", "c", "x", "y"}
+		depGot := graph.getDependency("r")
+		depWant := []target{"o", "m", "a", "r"}
 
 		if !reflect.DeepEqual(depGot, depWant) {
 			t.Errorf("got %v want %v", depGot, depWant)
