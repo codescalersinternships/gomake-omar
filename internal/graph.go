@@ -1,30 +1,28 @@
 package internal
 
 type graph struct {
-	adjacencyList map[target][]parent
+	adjacencyList map[string][]string
 
-	isVisited   map[target]bool
-	isExploring map[target]bool
-	dfsStack    []target
+	isVisited   map[string]bool
+	isExploring map[string]bool
+	dfsStack    []string
 }
 
-func newGraph(adjacencyList map[target][]parent) graph {
+func newGraph(adjacencyList map[string][]string) graph {
 	return graph{
 		adjacencyList: adjacencyList,
-		isVisited:     map[target]bool{},
-		isExploring:   map[target]bool{},
-		dfsStack:      []target{},
+		isVisited:     map[string]bool{},
+		isExploring:   map[string]bool{},
+		dfsStack:      []string{},
 	}
 }
 
-func (g *graph) isCyclic(currentNode target) bool {
+func (g *graph) isCyclic(currentNode string) bool {
 	g.isVisited[currentNode] = true
 	g.isExploring[currentNode] = true
 	g.dfsStack = append(g.dfsStack, currentNode)
 
 	for _, nextNode := range g.adjacencyList[currentNode] {
-		nextNode := target(nextNode)
-
 		if g.isExploring[nextNode] ||
 			(!g.isVisited[nextNode] && g.isCyclic(nextNode)) {
 			return true
@@ -33,15 +31,15 @@ func (g *graph) isCyclic(currentNode target) bool {
 
 	g.dfsStack = g.dfsStack[:len(g.dfsStack)-1]
 	g.isExploring[currentNode] = false
+
 	return false
 }
 
-func (g *graph) topologicalSort(currentNode target) []target {
+func (g *graph) topologicalSort(currentNode string) []string {
 	g.isVisited[currentNode] = true
 
-	targetsOrder := []target{}
+	targetsOrder := []string{}
 	for _, nextNode := range g.adjacencyList[currentNode] {
-		nextNode := target(nextNode)
 		if !g.isVisited[nextNode] {
 			targetsOrder = append(targetsOrder, g.topologicalSort(nextNode)...)
 		}
@@ -51,12 +49,12 @@ func (g *graph) topologicalSort(currentNode target) []target {
 	return targetsOrder
 }
 
-func (g *graph) getDependency(currentTarget target) []target {
-	g.isVisited = map[target]bool{}
+func (g *graph) getOrderedDependencies(currentTarget string) []string {
+	g.isVisited = map[string]bool{}
 	return g.topologicalSort(currentTarget)
 }
 
-func (g *graph) getCycle() []target {
+func (g *graph) getCycle() []string {
 	isCyclic := false
 
 	for k := range g.adjacencyList {
@@ -71,7 +69,7 @@ func (g *graph) getCycle() []target {
 	}
 
 	if !isCyclic {
-		return []target{}
+		return []string{}
 	}
 
 	return g.dfsStack

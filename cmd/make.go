@@ -9,21 +9,50 @@ import (
 	"github.com/codescalersinternships/gomake-omar/internal"
 )
 
+func checkErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	fmt.Fprintln(os.Stderr, "Error:", err)
+	switch {
+	case errors.Is(err, internal.ErrInvalidMakefileFormat):
+		os.Exit(1)
+	case errors.Is(err, internal.ErrCouldntExecuteCommand):
+		os.Exit(2)
+	default:
+		os.Exit(5)
+	}
+
+	return true
+}
+
 func main() {
-	filepath := flag.String("f", "", "Specify the filepath")
-	target := flag.String("t", "", "Specify the target")
+	var filepath, targetName string
+	flag.StringVar(&filepath, "f", "./Makefile", "Specify the filepath")
+	flag.StringVar(&targetName, "t", "", "Specify the target")
 	flag.Parse()
 
+	if targetName == "" {
+		checkErr(internal.ErrNoTarget)
+		return
+	}
+
 	gomake := internal.NewGomake()
-	err := gomake.RunGoMake(*filepath, *target)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		if errors.Is(err, internal.ErrInvalidMakefileFormat) {
-			os.Exit(1)
-		} else if errors.Is(err, internal.ErrCouldntExecuteCommand) {
-			os.Exit(2)
-		} else {
-			os.Exit(5)
-		}
+
+	f, err := os.Open(filepath)
+	if checkErr(err) {
+		return
+	}
+	defer f.Close()
+
+	err = gomake.Build(f)
+	if checkErr(err) {
+		return
+	}
+
+	err = gomake.Run(targetName)
+	if checkErr(err) {
+		return
 	}
 }

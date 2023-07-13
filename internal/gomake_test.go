@@ -23,8 +23,8 @@ publish : test gendocs
 	echo 'executing gendocs'
 `
 
-func depGraphSample1() map[target][]parent {
-	return map[target][]parent{
+func depGraphSample1() map[string][]string {
+	return map[string][]string{
 		"build":   {},
 		"test":    {},
 		"publish": {"test", "gendocs"},
@@ -32,16 +32,7 @@ func depGraphSample1() map[target][]parent {
 	}
 }
 
-func actionGraphSample1() map[target][]action {
-	return map[target][]action{
-		"build":   {"@echo 'executing build'", "@echo 'cmd2'"},
-		"test":    {"echo 'executing test'"},
-		"publish": {"echo 'executing publish'"},
-		"gendocs": {"echo 'executing gendocs'"},
-	}
-}
-
-func TestLoadData(t *testing.T) {
+func TestReadData(t *testing.T) {
 	t.Run("valid makefile format", func(t *testing.T) {
 		f, err := os.CreateTemp("", "test_file")
 		assertErr(t, err, nil)
@@ -53,10 +44,10 @@ func TestLoadData(t *testing.T) {
 		assertErr(t, err, nil)
 
 		gomake := NewGomake()
-		err = gomake.loadData(f)
+		err = gomake.readData(f)
 		assertErr(t, err, nil)
 
-		assertEqualDepGraphs(t, gomake.dependencyGraph, depGraphSample1())
+		assertEqualDepGraphs(t, gomake.getDependencyGraph(), depGraphSample1())
 	})
 
 	invalidTestCases := []struct {
@@ -76,7 +67,7 @@ func TestLoadData(t *testing.T) {
 		}, {
 			name:     "invalid format: invalid target line",
 			makefile: ":dep",
-			err:      ErrTargetMustBeSpecified,
+			err:      ErrNoTarget,
 		}, {
 			name:     "invalid format: invalid action line",
 			makefile: "build: dep\n@echo 'too sad'",
@@ -96,41 +87,45 @@ func TestLoadData(t *testing.T) {
 			assertErr(t, err, nil)
 
 			gomake := NewGomake()
-			err = gomake.loadData(f)
+			err = gomake.readData(f)
 			assertErr(t, err, tc.err)
 		})
 	}
 }
 
-func TestRunGoMake(t *testing.T) {
+func TestBuild(t *testing.T) {
 	testCases := []struct {
-		name       string
-		target     target
-		makefile   string
-		err        error
-		depWant    map[target][]parent
-		actionWant map[target][]action
+		name     string
+		target   string
+		makefile string
+		err      error
+		depWant  map[string][]string
+		commands []command
 	}{
 		{
-			name:       "given file path",
-			target:     "publish",
-			makefile:   makeFileSample1,
-			err:        nil,
-			depWant:    depGraphSample1(),
-			actionWant: actionGraphSample1(),
+			name:     "given file path",
+			target:   "publish",
+			makefile: makeFileSample1,
+			err:      nil,
+			depWant:  depGraphSample1(),
+			commands: []command{{
+				cmd:        "echo 'executing publish'",
+				suppressed: false,
+			}},
 		},
 		{
-			name:       "no file path given",
-			target:     "publish",
-			makefile:   makeFileSample1,
-			err:        nil,
-			depWant:    depGraphSample1(),
-			actionWant: actionGraphSample1(),
-		}, {
-			name:     "no target given",
-			target:   "",
+			name:     "no file path given",
+			target:   "build",
 			makefile: makeFileSample1,
-			err:      ErrTargetMustBeSpecified,
+			err:      nil,
+			depWant:  depGraphSample1(),
+			commands: []command{{
+				cmd:        "echo 'executing build'",
+				suppressed: true,
+			}, {
+				cmd:        "echo 'cmd2'",
+				suppressed: true,
+			}},
 		}, {
 			name:   "cyclic dependency",
 			target: "a",
@@ -141,13 +136,10 @@ c: a
 `,
 			err: ErrCyclicDependency,
 		}, {
-			name:   "invalid command",
-			target: "a",
-			makefile: `
-a: 
-	@invalid command
-`,
-			err: ErrCouldntExecuteCommand,
+			name:     "invalid file format",
+			target:   "a",
+			makefile: "invalid format",
+			err:      ErrInvalidMakefileFormat,
 		}, {
 			name:   "target repeats",
 			target: "a",
@@ -163,15 +155,13 @@ b:
 	echo 'b'
 `,
 			err: nil,
-			depWant: map[target][]parent{
+			depWant: map[string][]string{
 				"a": {"c", "b", "b"},
 				"c": {},
 				"b": {},
 			},
-			actionWant: map[target][]action{
-				"a": {"echo 'newa'"},
-				"c": {"echo 'c'"},
-				"b": {"echo 'b'"},
+			commands: []command{
+				{cmd: "echo 'newa'", suppressed: false},
 			},
 		},
 	}
@@ -188,13 +178,66 @@ b:
 			assertErr(t, err, nil)
 
 			gomake := NewGomake()
-			err = gomake.RunGoMake(f.Name(), string(tc.target))
+			err = gomake.Build(f)
 			assertErr(t, err, tc.err)
 
 			if tc.err == nil {
-				assertEqualDepGraphs(t, gomake.dependencyGraph, tc.depWant)
-				assertEqualActionGraphs(t, gomake.actionExecuter.targetActions, tc.actionWant)
+				assertEqualDepGraphs(t, gomake.getDependencyGraph(), tc.depWant)
+
+				if !reflect.DeepEqual(gomake.targets[tc.target].commands, tc.commands) {
+					t.Errorf("got %v want %v", gomake.targets[tc.target].commands, tc.commands)
+				}
 			}
+		})
+	}
+}
+
+func TestRun(t *testing.T) {
+	testCases := []struct {
+		name     string
+		target   string
+		makefile string
+		err      error
+	}{
+		{
+			name:     "valid",
+			target:   "build",
+			makefile: makeFileSample1,
+			err:      nil,
+		},
+		{
+			name:     "target is not exist in file",
+			target:   "not found",
+			makefile: makeFileSample1,
+			err:      ErrDependencyNotFound,
+		}, {
+			name:   "invalid command",
+			target: "a",
+			makefile: `
+a:
+	@invalid command
+		`,
+			err: ErrCouldntExecuteCommand,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			f, err := os.CreateTemp("", "Makefile")
+			assertErr(t, err, nil)
+			defer os.Remove(f.Name())
+
+			_, err = f.WriteString(tc.makefile)
+			assertErr(t, err, nil)
+			_, err = f.Seek(0, io.SeekStart)
+			assertErr(t, err, nil)
+
+			gomake := NewGomake()
+			err = gomake.Build(f)
+			assertErr(t, err, nil)
+
+			err = gomake.Run(tc.target)
+			assertErr(t, err, tc.err)
 		})
 	}
 }
@@ -212,7 +255,7 @@ func assertErr(t testing.TB, got, want error) {
 	}
 }
 
-func assertEqualDepGraphs(t testing.TB, got, want map[target][]parent) {
+func assertEqualDepGraphs(t testing.TB, got, want map[string][]string) {
 	t.Helper()
 	for k, v := range got {
 		if want[k] == nil {
@@ -220,12 +263,8 @@ func assertEqualDepGraphs(t testing.TB, got, want map[target][]parent) {
 			t.Fatalf("key %q exists in got and not exist in want", k)
 		}
 
-		sort.Slice(want[k], func(i, j int) bool {
-			return want[k][i] < want[k][j]
-		})
-		sort.Slice(v, func(i, j int) bool {
-			return v[i] < v[j]
-		})
+		sort.Strings(want[k])
+		sort.Strings(v)
 
 		if !reflect.DeepEqual(v, want[k]) {
 			t.Errorf("in key %q got value %v want value %v", k, v, want[k])
@@ -233,31 +272,6 @@ func assertEqualDepGraphs(t testing.TB, got, want map[target][]parent) {
 	}
 
 	if len(got) != len(want) {
-		t.Errorf("there is keys in want not exist in got\ngot %v want %v", got, want)
-	}
-}
-
-func assertEqualActionGraphs(t testing.TB, got, want map[target][]action) {
-	t.Helper()
-	for k, v := range got {
-		if want[k] == nil {
-			t.Errorf("got %v want %v", got, want)
-			t.Fatalf("key %q exists in got and not exist in want", k)
-		}
-
-		sort.Slice(want[k], func(i, j int) bool {
-			return want[k][i] < want[k][j]
-		})
-		sort.Slice(v, func(i, j int) bool {
-			return v[i] < v[j]
-		})
-
-		if !reflect.DeepEqual(v, want[k]) {
-			t.Errorf("in key %q got value %v want value %v", k, v, want[k])
-		}
-	}
-
-	if len(got) != len(want) {
-		t.Errorf("there is keys in want not exist in got\ngot %v want %v", got, want)
+		t.Errorf("there are keys in want not exist in got\ngot %v want %v", got, want)
 	}
 }

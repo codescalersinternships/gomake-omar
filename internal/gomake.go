@@ -5,101 +5,119 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 )
 
 var (
 	ErrInvalidMakefileFormat = errors.New("invalid makefile format")
-	ErrTargetMustBeSpecified = errors.New("target must be specified")
+	ErrNoTarget              = errors.New("target must be specified")
 	ErrCyclicDependency      = errors.New("there is a cyclic dependency")
-	ErrCouldntExecuteCommand = errors.New("couldn't execute command")
+	ErrCouldntExecuteCommand = errors.New("could not execute command")
 	ErrDependencyNotFound    = errors.New("dependency rule is not found")
 )
 
-type target string
-type parent string
+type target struct {
+	dependencies []string
+	commands     []command
+}
 
-type gomake struct {
-	dependencyGraph map[target][]parent
-	actionExecuter  executer
+type Make struct {
+	targets map[string]target
 }
 
 // NewGomake is a factory of gomake struct
-func NewGomake() gomake {
-	return gomake{
-		dependencyGraph: map[target][]parent{},
-		actionExecuter:  newExecuter(),
+func NewGomake() Make {
+	return Make{
+		targets: map[string]target{},
 	}
 }
 
-func (gomake *gomake) addActionLine(target target, actionLine string) error {
-	if target == "" {
+func (gomake *Make) getDependencyGraph() map[string][]string {
+	g := map[string][]string{}
+
+	for targetName, target := range gomake.targets {
+		g[targetName] = target.dependencies
+	}
+
+	return g
+}
+
+func (mk *Make) addCommandLine(targetName, commandLine string) error {
+	if targetName == "" { // try to add command before writing a target
 		return ErrInvalidMakefileFormat
 	}
 
-	action := action(strings.TrimSpace(actionLine))
-	if action != "" {
-		gomake.actionExecuter.setAction(target, action)
+	cmd := strings.TrimSpace(commandLine)
+	if cmd == "" || cmd == "@" {
+		return nil
 	}
+
+	// take a copy
+	entry := mk.targets[targetName]
+
+	if cmd[0] == '@' {
+		entry.commands = append(entry.commands, command{cmd[1:], true})
+	} else {
+		entry.commands = append(entry.commands, command{cmd, false})
+	}
+
+	// update
+	mk.targets[targetName] = entry
 
 	return nil
 }
 
-func (gomake *gomake) addTargetLine(targetLine string) (target, error) {
+func (mk *Make) addTargetLine(targetLine string) (string, error) {
 	lineParts := strings.SplitN(targetLine, ":", 2)
-	target := target(strings.TrimSpace(lineParts[0]))
-	parents := strings.Split(lineParts[1], " ")
+	targetName := strings.TrimSpace(lineParts[0])
+	dependencies := strings.Fields(lineParts[1])
 
-	if target == "" {
-		return "", ErrTargetMustBeSpecified
+	if targetName == "" {
+		return "", ErrNoTarget
 	}
 
-	filteredParents := []parent{}
-	for _, p := range parents {
-		parent := parent(strings.TrimSpace(p))
-		if parent != "" {
-			filteredParents = append(filteredParents, parent)
-		}
-	}
+	// take a copy
+	entry := mk.targets[targetName]
 
-	if gomake.dependencyGraph[target] != nil {
-		// target appeared before
-		fmt.Printf("warning: overriding recipe for target %q\n", target)
-		fmt.Printf("warning: ignoring old recipe for target %q\n", target)
+	if entry.dependencies != nil {
+		// target name appeared before
+		fmt.Printf("warning: overriding recipe for target %q\n", targetName)
+		fmt.Printf("warning: ignoring old recipe for target %q\n", targetName)
 
-		gomake.actionExecuter.removeActions(target)
-
+		// remove last added commands
+		entry.commands = []command{}
 		// append at the front to keep dependency order as makefile doing
-		gomake.dependencyGraph[target] = append(filteredParents, gomake.dependencyGraph[target]...)
+		entry.dependencies = append(dependencies, entry.dependencies...)
 	} else {
-		gomake.dependencyGraph[target] = filteredParents
+		entry.dependencies = dependencies
 	}
 
-	return target, nil
+	// update
+	mk.targets[targetName] = entry
+
+	return targetName, nil
 }
 
-func (gomake *gomake) loadData(f io.Reader) error {
-	fileScanner := bufio.NewScanner(f)
+func (mk *Make) readData(r io.Reader) error {
+	fileScanner := bufio.NewScanner(r)
 	fileScanner.Split(bufio.ScanLines)
 
-	currentTargetName := target("")
+	currentTargetName := ""
 	for fileScanner.Scan() {
 		line := fileScanner.Text()
 
 		if strings.HasPrefix(line, "\t") {
 			// this is action
-			err := gomake.addActionLine(currentTargetName, line)
-			if err != nil {
+
+			if err := mk.addCommandLine(currentTargetName, line); err != nil {
 				return err
 			}
-
 			continue
 		}
 
 		if strings.Contains(line, ":") {
 			// this is rule
-			target, err := gomake.addTargetLine(line)
+			target, err := mk.addTargetLine(line)
 			if err != nil {
 				return err
 			}
@@ -116,43 +134,41 @@ func (gomake *gomake) loadData(f io.Reader) error {
 	return nil
 }
 
-func getCycleString(cycle []target) string {
-	castedCycle := make([]string, len(cycle))
-	for i, v := range cycle {
-		castedCycle[i] = string(v)
-	}
-
-	return fmt.Sprintf("%v -> %v", strings.Join(castedCycle, " -> "), castedCycle[0])
-}
-
-// RunGoMake checks if there's cyclic dependency within makefile then run target
-func (gomake *gomake) RunGoMake(filePath, targetToExecute string) error {
-	if targetToExecute == "" {
-		return fmt.Errorf("%w, use -t to specify it", ErrTargetMustBeSpecified)
-	}
-
-	if filePath == "" {
-		filePath = "Makefile"
-	}
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	err = gomake.loadData(file)
+// Build analyze given data and prepare it to execute
+func (mk *Make) Build(r io.Reader) error {
+	err := mk.readData(r)
 	if err != nil {
 		return err
 	}
 
-	graph := newGraph(gomake.dependencyGraph)
+	// checkCyclicDependency
+	graph := newGraph(mk.getDependencyGraph())
 	cycle := graph.getCycle()
 
 	if len(cycle) != 0 {
-		return fmt.Errorf("%w, cycle: %q", ErrCyclicDependency, getCycleString(cycle))
+		cycleStr := fmt.Sprintf("%v -> %v", strings.Join(cycle, " -> "), cycle[0])
+		return fmt.Errorf("%w, cycle: %q", ErrCyclicDependency, cycleStr)
 	}
 
-	dependencies := graph.getDependency(target(targetToExecute))
-	return gomake.actionExecuter.execute(dependencies)
+	return nil
+}
+
+// Run executes target
+func (mk *Make) Run(targetName string) error {
+	graph := newGraph(mk.getDependencyGraph())
+	orderedDep := graph.getOrderedDependencies(targetName)
+
+	for _, dep := range orderedDep {
+		if _, ok := mk.targets[targetName]; !ok {
+			return fmt.Errorf("%w, target %q dependant on %q", ErrDependencyNotFound, targetName, dep)
+		}
+
+		for _, command := range mk.targets[dep].commands {
+			if err := command.execute(); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }
