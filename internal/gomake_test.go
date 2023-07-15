@@ -211,6 +211,11 @@ func TestRun(t *testing.T) {
 			makefile: makeFileSample1,
 			err:      ErrDependencyNotFound,
 		}, {
+			name:     "dependency is not exist in file",
+			target:   "a",
+			makefile: "a:b",
+			err:      ErrDependencyNotFound,
+		}, {
 			name:   "invalid command",
 			target: "a",
 			makefile: `
@@ -246,9 +251,9 @@ func assertErr(t testing.TB, got, want error) {
 	t.Helper()
 	if !errors.Is(got, want) {
 		if got == nil {
-			t.Errorf("got nil want %q", want.Error())
+			t.Fatalf("got nil want %q", want.Error())
 		} else if want == nil {
-			t.Errorf("got %q want nil", got.Error())
+			t.Fatalf("got %q want nil", got.Error())
 		} else {
 			t.Errorf("got %q want %q", got.Error(), want.Error())
 		}

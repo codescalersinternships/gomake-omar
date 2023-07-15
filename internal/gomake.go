@@ -17,6 +17,7 @@ var (
 )
 
 type target struct {
+	name         string
 	dependencies []string
 	commands     []command
 }
@@ -42,93 +43,104 @@ func (gomake *Make) getDependencyGraph() map[string][]string {
 	return g
 }
 
-func (mk *Make) addCommandLine(targetName, commandLine string) error {
-	if targetName == "" { // try to add command before writing a target
-		return ErrInvalidMakefileFormat
-	}
-
-	cmd := strings.TrimSpace(commandLine)
-	if cmd == "" || cmd == "@" {
-		return nil
-	}
-
-	// take a copy
-	entry := mk.targets[targetName]
-
-	if cmd[0] == '@' {
-		entry.commands = append(entry.commands, command{cmd[1:], true})
-	} else {
-		entry.commands = append(entry.commands, command{cmd, false})
-	}
-
-	// update
-	mk.targets[targetName] = entry
-
-	return nil
-}
-
-func (mk *Make) addTargetLine(targetLine string) (string, error) {
+func (mk *Make) parseTargetLine(targetLine string) (target, error) {
 	lineParts := strings.SplitN(targetLine, ":", 2)
 	targetName := strings.TrimSpace(lineParts[0])
 	dependencies := strings.Fields(lineParts[1])
 
 	if targetName == "" {
-		return "", ErrNoTarget
+		return target{}, ErrNoTarget
+	}
+
+	t := target{name: targetName, dependencies: dependencies}
+	return t, nil
+}
+
+func (mk *Make) parseCommandLine(commandLine string) command {
+	// 'commandLine' definitely has at least one non-whitespace character
+
+	commandLine = strings.TrimSpace(commandLine)
+	if commandLine[0] == '@' {
+		return command{cmd: commandLine[1:], suppressed: true}
+	}
+	return command{cmd: commandLine, suppressed: false}
+}
+
+func (mk *Make) setTarget(t target) {
+	if _, ok := mk.targets[t.name]; !ok {
+		// this target name haven't been added before
+		mk.targets[t.name] = t
+		return
+	}
+
+	fmt.Printf("warning: overriding recipe for target %q\n", t.name)
+	fmt.Printf("warning: ignoring old recipe for target %q\n", t.name)
+
+	// take a copy
+	entry := mk.targets[t.name]
+
+	// remove last added commands
+	entry.commands = []command{}
+	// append at the front to keep dependency order as makefile doing
+	entry.dependencies = append(t.dependencies, entry.dependencies...)
+
+	// update
+	mk.targets[t.name] = entry
+}
+
+func (mk *Make) setCommand(t target, c command) error {
+	if t.name == "" {
+		// try to add command before initialize target
+		return ErrInvalidMakefileFormat
 	}
 
 	// take a copy
-	entry := mk.targets[targetName]
+	entry := mk.targets[t.name]
 
-	if entry.dependencies != nil {
-		// target name appeared before
-		fmt.Printf("warning: overriding recipe for target %q\n", targetName)
-		fmt.Printf("warning: ignoring old recipe for target %q\n", targetName)
-
-		// remove last added commands
-		entry.commands = []command{}
-		// append at the front to keep dependency order as makefile doing
-		entry.dependencies = append(dependencies, entry.dependencies...)
-	} else {
-		entry.dependencies = dependencies
-	}
+	entry.commands = append(entry.commands, c)
 
 	// update
-	mk.targets[targetName] = entry
+	mk.targets[t.name] = entry
 
-	return targetName, nil
+	return nil
 }
 
 func (mk *Make) readData(r io.Reader) error {
 	fileScanner := bufio.NewScanner(r)
 	fileScanner.Split(bufio.ScanLines)
 
-	currentTargetName := ""
+	currentTarget := target{}
 	for fileScanner.Scan() {
 		line := fileScanner.Text()
 
-		if strings.HasPrefix(line, "\t") {
-			// this is action
+		if strings.TrimSpace(line) == "" {
+			// empty line
+			continue
+		}
 
-			if err := mk.addCommandLine(currentTargetName, line); err != nil {
+		if strings.HasPrefix(line, "\t") {
+			// this is command line
+
+			c := mk.parseCommandLine(line)
+			if err := mk.setCommand(currentTarget, c); err != nil {
 				return err
 			}
 			continue
 		}
 
 		if strings.Contains(line, ":") {
-			// this is rule
-			target, err := mk.addTargetLine(line)
+			// this is target line
+
+			t, err := mk.parseTargetLine(line)
 			if err != nil {
 				return err
 			}
-
-			currentTargetName = target
+			mk.setTarget(t)
+			currentTarget = t
 			continue
 		}
 
-		if strings.TrimSpace(line) != "" {
-			return fmt.Errorf("%w, at line %q", ErrInvalidMakefileFormat, line)
-		}
+		return fmt.Errorf("%w, at line %q", ErrInvalidMakefileFormat, line)
 	}
 
 	return nil
@@ -136,12 +148,11 @@ func (mk *Make) readData(r io.Reader) error {
 
 // Build analyze given data and prepare it to execute
 func (mk *Make) Build(r io.Reader) error {
-	err := mk.readData(r)
-	if err != nil {
+	if err := mk.readData(r); err != nil {
 		return err
 	}
 
-	// checkCyclicDependency
+	// check cyclic dependency
 	graph := newGraph(mk.getDependencyGraph())
 	cycle := graph.getCycle()
 
@@ -155,11 +166,15 @@ func (mk *Make) Build(r io.Reader) error {
 
 // Run executes target
 func (mk *Make) Run(targetName string) error {
+	if _, ok := mk.targets[targetName]; !ok {
+		return fmt.Errorf("%w, target %q", ErrDependencyNotFound, targetName)
+	}
+
 	graph := newGraph(mk.getDependencyGraph())
 	orderedDep := graph.getOrderedDependencies(targetName)
 
 	for _, dep := range orderedDep {
-		if _, ok := mk.targets[targetName]; !ok {
+		if _, ok := mk.targets[dep]; !ok {
 			return fmt.Errorf("%w, target %q dependant on %q", ErrDependencyNotFound, targetName, dep)
 		}
 

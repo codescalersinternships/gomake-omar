@@ -12,20 +12,35 @@ Gomake is a command-line tool designed to check for cyclic dependencies in a Mak
 
 ## Installation
 
-To install Gomake, follow these steps:
+Before proceeding with the installation, ensure you have Go programming language (version 1.16 or higher) on your system, you can download and install Go from the [official Go website](https://golang.org)
 
-1. Ensure that Go is installed on your system. If not, you can download and install it from the [official Go website](https://golang.org).
+### option1: Download Pre-built Binary
+This option allows you to download and use the pre-built binary for your operating system, which simplifies the installation process.
 
-2. Clone the Gomake repository to your local machine:
+1. Download the Binary, go to the GitHub [Releases page](hhttps://github.com/codescalersinternships/gomake-omar/releases) and download the binary that corresponds to your operating system and architecture. For example, for Linux 64-bit, you may find a file like `gomake-omar_Linux_arm64.tar.gz`.
 
+2. Extract the Binary, after downloading the binary archive, extract its contents to a directory of your choice.
+```bash
+tar -xzf gomake-omar_Linux_arm64.tar.gz
+```
+
+3. Run the gomake app, see [Usage section](#usage)
+
+### option2: Clone and Build from Source
+This option is suitable if you want to build the Go Console App from the source code.
+
+1. Clone the Gomake repository to your local machine:
 ```shell
 $ git clone https://github.com/codescalersinternships/gomake-omar
 $ cd gomake-omar
 ```
-3. Build the Gomake binary using the Go compiler:
+
+2. Build the Gomake binary using the Go compiler:
 ```shell
 $ go build -o gomake ./cmd/make.go
 ```
+
+3. Run the gomake app, see [Usage section](#usage)
 
 ## Usage
 
