@@ -60,10 +60,14 @@ func (mk *Make) parseCommandLine(commandLine string) command {
 	// 'commandLine' definitely has at least one non-whitespace character
 
 	commandLine = strings.TrimSpace(commandLine)
-	if commandLine[0] == '@' {
-		return command{cmd: commandLine[1:], suppressed: true}
+	parts := strings.Fields(string(commandLine))
+	cmdName := parts[0]
+	cmdArgs := parts[1:]
+
+	if cmdName[0] == '@' {
+		return command{cmdName: cmdName[1:], cmdArgs: cmdArgs, suppressed: true}
 	}
-	return command{cmd: commandLine, suppressed: false}
+	return command{cmdName: cmdName, cmdArgs: cmdArgs, suppressed: false}
 }
 
 func (mk *Make) setTarget(t target) {

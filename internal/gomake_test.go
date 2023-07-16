@@ -109,7 +109,8 @@ func TestBuild(t *testing.T) {
 			err:      nil,
 			depWant:  depGraphSample1(),
 			commands: []command{{
-				cmd:        "echo 'executing publish'",
+				cmdName:    "echo",
+				cmdArgs:    []string{"'executing", "publish'"},
 				suppressed: false,
 			}},
 		},
@@ -120,10 +121,12 @@ func TestBuild(t *testing.T) {
 			err:      nil,
 			depWant:  depGraphSample1(),
 			commands: []command{{
-				cmd:        "echo 'executing build'",
+				cmdName:    "echo",
+				cmdArgs:    []string{"'executing", "build'"},
 				suppressed: true,
 			}, {
-				cmd:        "echo 'cmd2'",
+				cmdName:    "echo",
+				cmdArgs:    []string{"'cmd2'"},
 				suppressed: true,
 			}},
 		}, {
@@ -161,7 +164,11 @@ b:
 				"b": {},
 			},
 			commands: []command{
-				{cmd: "echo 'newa'", suppressed: false},
+				{
+					cmdName:    "echo",
+					cmdArgs:    []string{"'newa'"},
+					suppressed: false,
+				},
 			},
 		},
 	}
@@ -183,7 +190,6 @@ b:
 
 			if tc.err == nil {
 				assertEqualDepGraphs(t, gomake.getDependencyGraph(), tc.depWant)
-
 				if !reflect.DeepEqual(gomake.targets[tc.target].commands, tc.commands) {
 					t.Errorf("got %v want %v", gomake.targets[tc.target].commands, tc.commands)
 				}

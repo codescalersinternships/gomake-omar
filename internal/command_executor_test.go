@@ -1,11 +1,13 @@
 package internal
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestExecute(t *testing.T) {
 	t.Run("valid command with @", func(t *testing.T) {
 		gomake := NewGomake()
-		err := gomake.setCommand(target{name: "target"}, command{cmd: "echo 'action'", suppressed: true})
+		err := gomake.setCommand(target{name: "target"}, command{cmdName: "echo", cmdArgs: []string{"action"}, suppressed: true})
 		assertErr(t, err, nil)
 
 		err = gomake.targets["target"].commands[0].execute()
@@ -14,7 +16,7 @@ func TestExecute(t *testing.T) {
 
 	t.Run("valid command without @", func(t *testing.T) {
 		gomake := NewGomake()
-		err := gomake.setCommand(target{name: "target"}, command{cmd: "echo 'action'", suppressed: false})
+		err := gomake.setCommand(target{name: "target"}, command{cmdName: "echo", cmdArgs: []string{"action"}, suppressed: false})
 
 		assertErr(t, err, nil)
 
@@ -24,7 +26,7 @@ func TestExecute(t *testing.T) {
 
 	t.Run("invalid commands", func(t *testing.T) {
 		gomake := NewGomake()
-		err := gomake.setCommand(target{name: "target"}, command{cmd: "invalid", suppressed: true})
+		err := gomake.setCommand(target{name: "target"}, command{cmdName: "invalid", suppressed: true})
 
 		assertErr(t, err, nil)
 

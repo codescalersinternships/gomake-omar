@@ -3,28 +3,24 @@ package internal
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 )
 
 type command struct {
-	cmd        string
+	cmdName    string
+	cmdArgs    []string
 	suppressed bool // in case of @ prefixing the command
 }
 
 func (c *command) execute() error {
 	if c.suppressed {
-		fmt.Println(c.cmd)
+		fmt.Printf("%v %v\n", c.cmdName, c.cmdArgs)
 	}
 
-	parts := strings.Fields(string(c.cmd))
-	cmdName := parts[0]
-	cmdArgs := parts[1:]
-
-	cmd := exec.Command(cmdName, cmdArgs...)
+	cmd := exec.Command(c.cmdName, c.cmdArgs...)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
-		return ErrCouldntExecuteCommand
+		return fmt.Errorf("%w, error message: %q", ErrCouldntExecuteCommand, err)
 	}
 
 	fmt.Print(string(output))
