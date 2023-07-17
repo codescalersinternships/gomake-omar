@@ -58,8 +58,14 @@ func assertEqualCycles(t testing.TB, cycleGot, cycleWant []string) {
 		t.Fatalf("got %v want %v", cycleGot, cycleWant)
 	}
 
+	// to check for slices have the same relative order
+	// make them have the same value at index 0
+	// then check if they are identical
+
+	// try to make 'cycleWant' have the same value as 'cycleGot' at index 0
+	// by cyclic shift 'cycleWant' till values at index 0 equalize
 	for i := 0; i < len(cycleWant) && cycleWant[0] != cycleGot[0]; i++ {
-		cycleWant = append(cycleWant[1:], cycleWant[:1]...)
+		cycleWant = append(cycleWant[1:], cycleWant[0])
 	}
 
 	if !reflect.DeepEqual(cycleGot, cycleWant) {

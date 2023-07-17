@@ -2,46 +2,39 @@ package internal
 
 type graph struct {
 	adjacencyList map[string][]string
-
-	isVisited   map[string]bool
-	isExploring map[string]bool
-	dfsStack    []string
 }
 
 func newGraph(adjacencyList map[string][]string) graph {
 	return graph{
 		adjacencyList: adjacencyList,
-		isVisited:     map[string]bool{},
-		isExploring:   map[string]bool{},
-		dfsStack:      []string{},
 	}
 }
 
-func (g *graph) isCyclic(currentNode string) bool {
-	g.isVisited[currentNode] = true
-	g.isExploring[currentNode] = true
-	g.dfsStack = append(g.dfsStack, currentNode)
+func (g *graph) isCyclic(currentNode string, dfsStack *[]string, isVisited, isExploring *map[string]bool) bool {
+	(*isVisited)[currentNode] = true
+	(*isExploring)[currentNode] = true
+	(*dfsStack) = append((*dfsStack), currentNode)
 
 	for _, nextNode := range g.adjacencyList[currentNode] {
-		if g.isExploring[nextNode] ||
-			(!g.isVisited[nextNode] && g.isCyclic(nextNode)) {
+		if (*isExploring)[nextNode] ||
+			(!(*isVisited)[nextNode] && g.isCyclic(nextNode, dfsStack, isVisited, isExploring)) {
 			return true
 		}
 	}
 
-	g.dfsStack = g.dfsStack[:len(g.dfsStack)-1]
-	g.isExploring[currentNode] = false
+	(*dfsStack) = (*dfsStack)[:len((*dfsStack))-1]
+	(*isExploring)[currentNode] = false
 
 	return false
 }
 
-func (g *graph) topologicalSort(currentNode string) []string {
-	g.isVisited[currentNode] = true
+func (g *graph) topologicalSort(currentNode string, isVisited *map[string]bool) []string {
+	(*isVisited)[currentNode] = true
 
 	targetsOrder := []string{}
 	for _, nextNode := range g.adjacencyList[currentNode] {
-		if !g.isVisited[nextNode] {
-			targetsOrder = append(targetsOrder, g.topologicalSort(nextNode)...)
+		if !(*isVisited)[nextNode] {
+			targetsOrder = append(targetsOrder, g.topologicalSort(nextNode, isVisited)...)
 		}
 	}
 
@@ -50,27 +43,24 @@ func (g *graph) topologicalSort(currentNode string) []string {
 }
 
 func (g *graph) getOrderedDependencies(currentTarget string) []string {
-	g.isVisited = map[string]bool{}
-	return g.topologicalSort(currentTarget)
+	isVisited := map[string]bool{}
+	return g.topologicalSort(currentTarget, &isVisited)
 }
 
 func (g *graph) getCycle() []string {
-	isCyclic := false
+	isExploring := map[string]bool{}
+	isVisited := map[string]bool{}
+	dfsStack := []string{}
 
 	for k := range g.adjacencyList {
-		if g.isVisited[k] {
+		if isVisited[k] {
 			continue
 		}
 
-		isCyclic = isCyclic || g.isCyclic(k)
-		if isCyclic {
-			break
+		if g.isCyclic(k, &dfsStack, &isVisited, &isExploring) {
+			return dfsStack
 		}
 	}
 
-	if !isCyclic {
-		return []string{}
-	}
-
-	return g.dfsStack
+	return []string{}
 }

@@ -215,7 +215,7 @@ func TestRun(t *testing.T) {
 			name:     "target is not exist in file",
 			target:   "not found",
 			makefile: makeFileSample1,
-			err:      ErrDependencyNotFound,
+			err:      ErrTargetNotFound,
 		}, {
 			name:     "dependency is not exist in file",
 			target:   "a",

@@ -14,6 +14,7 @@ var (
 	ErrCyclicDependency      = errors.New("there is a cyclic dependency")
 	ErrCouldntExecuteCommand = errors.New("could not execute command")
 	ErrDependencyNotFound    = errors.New("dependency rule is not found")
+	ErrTargetNotFound        = errors.New("target not exist")
 )
 
 type target struct {
@@ -22,18 +23,18 @@ type target struct {
 	commands     []command
 }
 
-type Make struct {
+type GoMake struct {
 	targets map[string]target
 }
 
 // NewGomake is a factory of gomake struct
-func NewGomake() Make {
-	return Make{
+func NewGomake() GoMake {
+	return GoMake{
 		targets: map[string]target{},
 	}
 }
 
-func (gomake *Make) getDependencyGraph() map[string][]string {
+func (gomake *GoMake) getDependencyGraph() map[string][]string {
 	g := map[string][]string{}
 
 	for targetName, target := range gomake.targets {
@@ -43,7 +44,7 @@ func (gomake *Make) getDependencyGraph() map[string][]string {
 	return g
 }
 
-func (mk *Make) parseTargetLine(targetLine string) (target, error) {
+func (mk *GoMake) parseTargetLine(targetLine string) (target, error) {
 	lineParts := strings.SplitN(targetLine, ":", 2)
 	targetName := strings.TrimSpace(lineParts[0])
 	dependencies := strings.Fields(lineParts[1])
@@ -56,7 +57,7 @@ func (mk *Make) parseTargetLine(targetLine string) (target, error) {
 	return t, nil
 }
 
-func (mk *Make) parseCommandLine(commandLine string) command {
+func (mk *GoMake) parseCommandLine(commandLine string) command {
 	// 'commandLine' definitely has at least one non-whitespace character
 
 	commandLine = strings.TrimSpace(commandLine)
@@ -70,7 +71,7 @@ func (mk *Make) parseCommandLine(commandLine string) command {
 	return command{cmdName: cmdName, cmdArgs: cmdArgs, suppressed: false}
 }
 
-func (mk *Make) setTarget(t target) {
+func (mk *GoMake) setTarget(t target) {
 	if _, ok := mk.targets[t.name]; !ok {
 		// this target name haven't been added before
 		mk.targets[t.name] = t
@@ -92,7 +93,7 @@ func (mk *Make) setTarget(t target) {
 	mk.targets[t.name] = entry
 }
 
-func (mk *Make) setCommand(t target, c command) error {
+func (mk *GoMake) setCommand(t target, c command) error {
 	if t.name == "" {
 		// try to add command before initialize target
 		return ErrInvalidMakefileFormat
@@ -109,7 +110,7 @@ func (mk *Make) setCommand(t target, c command) error {
 	return nil
 }
 
-func (mk *Make) readData(r io.Reader) error {
+func (mk *GoMake) readData(r io.Reader) error {
 	fileScanner := bufio.NewScanner(r)
 	fileScanner.Split(bufio.ScanLines)
 
@@ -117,8 +118,8 @@ func (mk *Make) readData(r io.Reader) error {
 	for fileScanner.Scan() {
 		line := fileScanner.Text()
 
-		if strings.TrimSpace(line) == "" {
-			// empty line
+		if strings.TrimSpace(line) == "" || strings.HasPrefix(strings.TrimSpace(line), "#") {
+			// comment or empty line
 			continue
 		}
 
@@ -151,7 +152,7 @@ func (mk *Make) readData(r io.Reader) error {
 }
 
 // Build analyze given data and prepare it to execute
-func (mk *Make) Build(r io.Reader) error {
+func (mk *GoMake) Build(r io.Reader) error {
 	if err := mk.readData(r); err != nil {
 		return err
 	}
@@ -169,9 +170,9 @@ func (mk *Make) Build(r io.Reader) error {
 }
 
 // Run executes target
-func (mk *Make) Run(targetName string) error {
+func (mk *GoMake) Run(targetName string) error {
 	if _, ok := mk.targets[targetName]; !ok {
-		return fmt.Errorf("%w, target %q", ErrDependencyNotFound, targetName)
+		return fmt.Errorf("%w, target %q", ErrTargetNotFound, targetName)
 	}
 
 	graph := newGraph(mk.getDependencyGraph())

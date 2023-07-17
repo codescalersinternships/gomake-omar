@@ -5,39 +5,21 @@ import (
 )
 
 func TestExecute(t *testing.T) {
-	t.Run("valid command with @", func(t *testing.T) {
-		gomake := NewGomake()
-		err := gomake.setCommand(target{name: "target"}, command{cmdName: "echo", cmdArgs: []string{"action"}, suppressed: true})
-		assertErr(t, err, nil)
-
-		err = gomake.targets["target"].commands[0].execute()
+	t.Run("valid command, suppressed", func(t *testing.T) {
+		c := command{cmdName: "echo", cmdArgs: []string{"action"}, suppressed: true}
+		err := c.execute()
 		assertErr(t, err, nil)
 	})
 
-	t.Run("valid command without @", func(t *testing.T) {
-		gomake := NewGomake()
-		err := gomake.setCommand(target{name: "target"}, command{cmdName: "echo", cmdArgs: []string{"action"}, suppressed: false})
-
-		assertErr(t, err, nil)
-
-		err = gomake.targets["target"].commands[0].execute()
+	t.Run("valid command, not suppressed", func(t *testing.T) {
+		c := command{cmdName: "echo", cmdArgs: []string{"action"}, suppressed: false}
+		err := c.execute()
 		assertErr(t, err, nil)
 	})
 
-	t.Run("invalid commands", func(t *testing.T) {
-		gomake := NewGomake()
-		err := gomake.setCommand(target{name: "target"}, command{cmdName: "invalid", suppressed: true})
-
-		assertErr(t, err, nil)
-
-		err = gomake.targets["target"].commands[0].execute()
+	t.Run("invalid command", func(t *testing.T) {
+		c := command{cmdName: "invalid", cmdArgs: []string{"action"}, suppressed: true}
+		err := c.execute()
 		assertErr(t, err, ErrCouldntExecuteCommand)
-	})
-
-	t.Run("dependency not exist", func(t *testing.T) {
-		gomake := NewGomake()
-
-		err := gomake.Run("target")
-		assertErr(t, err, ErrDependencyNotFound)
 	})
 }
