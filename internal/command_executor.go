@@ -12,7 +12,7 @@ type command struct {
 }
 
 func (c *command) execute() error {
-	if c.suppressed {
+	if !c.suppressed {
 		fmt.Printf("%s %v\n", c.cmdName, c.cmdArgs)
 	}
 

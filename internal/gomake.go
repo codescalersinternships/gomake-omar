@@ -8,6 +8,7 @@ import (
 	"strings"
 )
 
+// Generic file system errors.
 var (
 	ErrInvalidMakefileFormat = errors.New("invalid makefile format")
 	ErrNoTarget              = errors.New("target must be specified")
@@ -23,6 +24,7 @@ type target struct {
 	commands     []command
 }
 
+// GoMake is struct loads makefile data, check cyclic dependency, and run target
 type GoMake struct {
 	targets map[string]target
 }
@@ -66,9 +68,9 @@ func (mk *GoMake) parseCommandLine(commandLine string) command {
 	cmdArgs := parts[1:]
 
 	if cmdName[0] == '@' {
-		return command{cmdName: cmdName[1:], cmdArgs: cmdArgs, suppressed: true}
+		return command{cmdName: cmdName[1:], cmdArgs: cmdArgs, suppressed: false}
 	}
-	return command{cmdName: cmdName, cmdArgs: cmdArgs, suppressed: false}
+	return command{cmdName: cmdName, cmdArgs: cmdArgs, suppressed: true}
 }
 
 func (mk *GoMake) setTarget(t target) {

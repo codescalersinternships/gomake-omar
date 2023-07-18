@@ -111,7 +111,7 @@ func TestBuild(t *testing.T) {
 			commands: []command{{
 				cmdName:    "echo",
 				cmdArgs:    []string{"'executing", "publish'"},
-				suppressed: false,
+				suppressed: true,
 			}},
 		},
 		{
@@ -123,11 +123,11 @@ func TestBuild(t *testing.T) {
 			commands: []command{{
 				cmdName:    "echo",
 				cmdArgs:    []string{"'executing", "build'"},
-				suppressed: true,
+				suppressed: false,
 			}, {
 				cmdName:    "echo",
 				cmdArgs:    []string{"'cmd2'"},
-				suppressed: true,
+				suppressed: false,
 			}},
 		}, {
 			name:   "cyclic dependency",
@@ -167,7 +167,7 @@ b:
 				{
 					cmdName:    "echo",
 					cmdArgs:    []string{"'newa'"},
-					suppressed: false,
+					suppressed: true,
 				},
 			},
 		},
