@@ -8,14 +8,19 @@ import (
 	"strings"
 )
 
-// Generic file system errors.
 var (
+	// ErrInvalidMakefileFormat happens when the loaded makefile format is invalid
 	ErrInvalidMakefileFormat = errors.New("invalid makefile format")
-	ErrNoTarget              = errors.New("target must be specified")
-	ErrCyclicDependency      = errors.New("there is a cyclic dependency")
+	// ErrNoTarget happens when target name is empty
+	ErrNoTarget = errors.New("target must be specified")
+	// ErrCyclicDependency happens when there is at least one cycle among dependencies
+	ErrCyclicDependency = errors.New("there is a cyclic dependency")
+	// ErrCouldntExecuteCommand happens when command execution return error
 	ErrCouldntExecuteCommand = errors.New("could not execute command")
-	ErrDependencyNotFound    = errors.New("dependency rule is not found")
-	ErrTargetNotFound        = errors.New("target not exist")
+	// ErrDependencyNotFound happens when dependency is not found in the loaded makefile
+	ErrDependencyNotFound = errors.New("dependency rule is not found")
+	// ErrTargetNotFound happens when the given target to execute is not found in the loaded makefile
+	ErrTargetNotFound = errors.New("target not exist")
 )
 
 type target struct {
