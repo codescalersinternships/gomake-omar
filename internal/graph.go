@@ -16,7 +16,7 @@ func (g *graph) getCycleDfs(currentNode string, isVisited, isExploring map[strin
 
 	for _, nextNode := range g.adjacencyList[currentNode] {
 		if isExploring[nextNode] {
-			return []string{currentNode, nextNode}, true
+			return []string{currentNode}, true
 		}
 
 		if !isVisited[nextNode] {

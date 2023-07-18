@@ -25,12 +25,11 @@ func TestGetCycle(t *testing.T) {
 			"x": {"y"},
 		})
 		cycleGot := graph.getCycle()
-		cycleWant := []string{"a", "c", "d", "a"}
+		cycleWant := []string{"a", "c", "d"}
 
 		assertEqualCycles(t, cycleGot, cycleWant)
 	})
 }
-
 func TestGetDependency(t *testing.T) {
 	t.Run("no cycle", func(t *testing.T) {
 		graph := newGraph(map[string][]string{
