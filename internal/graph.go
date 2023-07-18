@@ -43,13 +43,13 @@ func (g *graph) topologicalSort(currentNode string, isVisited *map[string]bool) 
 }
 
 func (g *graph) getOrderedDependencies(currentTarget string) []string {
-	isVisited := map[string]bool{}
+	isVisited := make(map[string]bool)
 	return g.topologicalSort(currentTarget, &isVisited)
 }
 
 func (g *graph) getCycle() []string {
-	isExploring := map[string]bool{}
-	isVisited := map[string]bool{}
+	isExploring := make(map[string]bool)
+	isVisited := make(map[string]bool)
 	dfsStack := []string{}
 
 	for k := range g.adjacencyList {
