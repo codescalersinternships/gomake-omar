@@ -10,30 +10,34 @@ func newGraph(adjacencyList map[string][]string) graph {
 	}
 }
 
-func (g *graph) isCyclic(currentNode string, dfsStack *[]string, isVisited, isExploring *map[string]bool) bool {
-	(*isVisited)[currentNode] = true
-	(*isExploring)[currentNode] = true
-	(*dfsStack) = append((*dfsStack), currentNode)
+func (g *graph) getCycleDfs(currentNode string, isVisited, isExploring map[string]bool) ([]string, bool) {
+	isVisited[currentNode] = true
+	isExploring[currentNode] = true
 
 	for _, nextNode := range g.adjacencyList[currentNode] {
-		if (*isExploring)[nextNode] ||
-			(!(*isVisited)[nextNode] && g.isCyclic(nextNode, dfsStack, isVisited, isExploring)) {
-			return true
+		if isExploring[nextNode] {
+			return []string{currentNode, nextNode}, true
+		}
+
+		if !isVisited[nextNode] {
+			stk, isCyclic := g.getCycleDfs(nextNode, isVisited, isExploring)
+
+			if isCyclic {
+				return append([]string{currentNode}, stk...), true
+			}
 		}
 	}
 
-	(*dfsStack) = (*dfsStack)[:len((*dfsStack))-1]
-	(*isExploring)[currentNode] = false
-
-	return false
+	isExploring[currentNode] = false
+	return []string{}, false
 }
 
-func (g *graph) topologicalSort(currentNode string, isVisited *map[string]bool) []string {
-	(*isVisited)[currentNode] = true
+func (g *graph) topologicalSort(currentNode string, isVisited map[string]bool) []string {
+	isVisited[currentNode] = true
 
 	targetsOrder := []string{}
 	for _, nextNode := range g.adjacencyList[currentNode] {
-		if !(*isVisited)[nextNode] {
+		if !isVisited[nextNode] {
 			targetsOrder = append(targetsOrder, g.topologicalSort(nextNode, isVisited)...)
 		}
 	}
@@ -44,21 +48,20 @@ func (g *graph) topologicalSort(currentNode string, isVisited *map[string]bool) 
 
 func (g *graph) getOrderedDependencies(currentTarget string) []string {
 	isVisited := make(map[string]bool)
-	return g.topologicalSort(currentTarget, &isVisited)
+	return g.topologicalSort(currentTarget, isVisited)
 }
 
 func (g *graph) getCycle() []string {
 	isExploring := make(map[string]bool)
 	isVisited := make(map[string]bool)
-	dfsStack := []string{}
 
 	for k := range g.adjacencyList {
 		if isVisited[k] {
 			continue
 		}
 
-		if g.isCyclic(k, &dfsStack, &isVisited, &isExploring) {
-			return dfsStack
+		if stk, isCyclic := g.getCycleDfs(k, isVisited, isExploring); isCyclic {
+			return stk
 		}
 	}
 

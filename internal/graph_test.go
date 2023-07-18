@@ -19,13 +19,13 @@ func TestGetCycle(t *testing.T) {
 
 	t.Run("there is a cycle", func(t *testing.T) {
 		graph := newGraph(map[string][]string{
-			"a": {"c", "b"},
+			"a": {"c", "x"},
 			"c": {"d"},
 			"d": {"a"},
 			"x": {"y"},
 		})
 		cycleGot := graph.getCycle()
-		cycleWant := []string{"a", "c", "d"}
+		cycleWant := []string{"a", "c", "d", "a"}
 
 		assertEqualCycles(t, cycleGot, cycleWant)
 	})

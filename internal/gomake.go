@@ -162,7 +162,7 @@ func (mk *GoMake) Build(r io.Reader) error {
 	cycle := graph.getCycle()
 
 	if len(cycle) != 0 {
-		cycleStr := fmt.Sprintf("%v -> %v", strings.Join(cycle, " -> "), cycle[0])
+		cycleStr := strings.Join(cycle, " -> ")
 		return fmt.Errorf("%w, cycle: %q", ErrCyclicDependency, cycleStr)
 	}
 
